@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: influxdb
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    database: test
+  - name: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+  - name: clickhouse
+    type: vertamedia-clickhouse-datasource
+    access: proxy
+    url: http://clickhouse:8123
+    database: default
+
+

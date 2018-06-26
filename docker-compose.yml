@@ -1,0 +1,88 @@
+version: '3.3'
+
+services:
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel,vertamedia-clickhouse-datasource"
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning
+      - ./dashboards:/var/lib/grafana/dashboards
+
+  influxdb:
+    image: influxdb
+    ports:
+    - "8086:8086"
+    environment:
+      INFLUXDB_DB: test
+#    logging:
+#      driver: none
+
+  influxdb-producer:
+    build:
+      context: ./influxdb_producer
+      dockerfile: Dockerfile
+    depends_on:
+      - influxdb
+    links:
+      - influxdb:influxdb
+#    logging:
+#      driver: none
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+    - "9090:9090"
+    depends_on:
+      - prometheus-producer
+    links:
+      - prometheus-producer:prometheus-producer
+    volumes:
+      - ./prometheus_producer/prometheus_config.yml:/etc/prometheus/prometheus.yml
+
+  prometheus-producer:
+    build:
+      context: ./prometheus_producer
+      dockerfile: Dockerfile
+    ports:
+    - "8000:8000"
+
+  clickhouse_producer:
+    build:
+      context: ./clickhouse_producer
+      dockerfile: Dockerfile
+    depends_on:
+      - clickhouse
+    links:
+      - clickhouse:clickhouse
+#    logging:
+#      driver: none
+
+  clickhouse:
+    image: yandex/clickhouse-server
+    ports:
+    - 8123
+
+  clickhouse-init:
+    container_name: clickhouse-init
+    image: yandex/clickhouse-client
+    command: |
+      --host=clickhouse
+      --user=default
+      --database=default
+      --query="CREATE TABLE IF NOT EXISTS default.metrics
+               (
+                   Name String,
+                   PartitionDate Date DEFAULT toDate(Time),
+                   Time DateTime,
+                   Value Float32
+               ) ENGINE = MergeTree(PartitionDate, (Name, PartitionDate), 8192)";
+    depends_on:
+      - clickhouse
+    links:
+      - clickhouse:clickhouse
